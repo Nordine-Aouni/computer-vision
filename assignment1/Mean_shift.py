@@ -4,21 +4,7 @@ import scipy.io
 from scipy.spatial.distance import pdist, cdist, squareform
 from plotclusters3D import plotclusters3D
 import matplotlib.pyplot as plt
-
-
-#img = cv2.imread('m.jpg', 0)
-#cv2.imshow('image',img)
-
-
-mat_dict = scipy.io.loadmat('pts.mat')
-data = mat_dict['data']
-#data = np.array([[1, 1, 2, 2, 3, 4], [1, 1, 2, 2, 3, 4], [0, 1, 2, 0, 3, 4]])
-print('data')
-print(data)
-print("pairwise distance:")
-print(squareform(pdist(data.T)))
-print("----")
-print()
+import time
 
 
 def find_peak(data, index, radius, metric="euclidean", threshold=0.01, verbose=False):
@@ -40,10 +26,8 @@ def find_peak(data, index, radius, metric="euclidean", threshold=0.01, verbose=F
 
     while np.linalg.norm(peak-previous_peak) > threshold:
         if verbose:
-            print("Iter:", iteration)
+            print("Iter:", iteration, '\t peak: ', peak)
             iteration += 1
-            print("Peak:", peak)
-            print()
 
         # Compute pairwise dist between point of interest and others.
         # Note: cdist requires its input to have the same number of dimensions.
@@ -54,7 +38,7 @@ def find_peak(data, index, radius, metric="euclidean", threshold=0.01, verbose=F
         peak = data[window, :].mean(axis=0)  # Update peak coordinates to mean of window points
         peak = peak.reshape(1, len(peak))  # Reshape peak to (1, n)
 
-    peak = peak.ravel()  # Reshape to (n,)
+    peak = peak.ravel()  # Reshape to return a (n,) array
 
     if verbose:
         print("Converged to: ", peak, '\n')
@@ -62,51 +46,76 @@ def find_peak(data, index, radius, metric="euclidean", threshold=0.01, verbose=F
     return peak
 
 
-def mean_shift(data, r):
+def mean_shift(data, radius, attraction_basin=True):
+    """
+    Find peak of every points in data according to the mean-shift algorithm.
+    :param data: (m, n) array of m points in a n-dimensional space
+    :param radius: Radius of search window used to calculate peaks.
+    :param attraction_basin: Boolean activating the basin-of-attraction heuristic. Heuristic recommended for speedup.
+    :return: (labels, peaks) Segmentation as a list of integers and a (m, n) array of peaks corresponding to input points
+    """
 
     data_transpose = data.T  # Note: cdist requires points as rows hence why the transpose operation
-    inter_peak_threshold = r / 4  # Arbitrary threshold. See assignment description
+    inter_peak_threshold = radius / 4  # Arbitrary threshold. See assignment description
     # Initialize matrix of peaks with peak corresponding to first index
-    first_peak = find_peak(data_transpose, 0, r, verbose=False)
-    peaks = first_peak[np.newaxis, :]
+    first_peak = find_peak(data_transpose, 0, radius, verbose=False)
+    peaks = first_peak[np.newaxis, :]  # Reshape so that peak matrix is initialized shape (1, n)
+    peaks_lookup = [None for _ in range(len(data_transpose))]
     labels = [0]  # Initialize first label
 
     for index in range(1, len(data_transpose)):  # Loop over remaining data points
 
-        new_peak = find_peak(data_transpose, index, r, verbose=False)
-        # Check if new peak should be merged with existing one
-        # Note: cdist requires its input to have the same number of dimensions. Thus reshape peak from (n,) to (1, n)
-        inter_peak_dist = cdist(new_peak[np.newaxis, :], peaks).ravel()
-        match = np.argwhere(inter_peak_dist < inter_peak_threshold).ravel()
+        if attraction_basin and peaks_lookup[index] is not None:  # Use look-up table if entry is available
+            new_peak = peaks_lookup[index]
 
-        if len(match) == 0:  # By construction of the matrix peaks there can only be 0 or 1 match
-            peak = new_peak  # No match thus keep new peak as it
-            label = labels[-1]+1  # No match thus assign new label
-        else:
-            new_peak = peaks[match[0], :]  # Match found thus assign matching peak to current point
-            label = labels[match[0]]  # Match found thus assign matching label to current point
+        else:  # No corresponding entry or no heuristics thus start search for peak
+
+            new_peak = find_peak(data_transpose, index, radius, verbose=False)
+            # Check if new peak should be merged with existing one
+            # Note: cdist requires its input to have the same number of dimensions. Thus reshape peak from (n,) to (1, n)
+            inter_peak_dist = cdist(new_peak[np.newaxis, :], peaks).ravel()
+            match = np.argwhere(inter_peak_dist < inter_peak_threshold).ravel()
+
+            if len(match) == 0:  # By construction of the matrix peaks there can only be 0 or 1 match
+                label = labels[-1]+1  # No match thus assign new label and peak as it is.
+            else:
+                new_peak = peaks[match[0], :]  # Match found thus assign matching peak to current point
+                label = labels[match[0]]  # Match found thus assign matching label to current point
+
+        if attraction_basin:  # Basin-of-attraction heuristic: assign same peak to points lying within radius dist.
+            # Note: cdist requires inputs to have same number of dimensions and rows to be points.
+            attraction_dist = cdist(new_peak[np.newaxis, :], data_transpose)  # dist between points and current peak
+            attraction_mask = np.argwhere(attraction_dist <= radius).ravel()  # Indices of attracted points
+            if len(attraction_mask) > 0:
+                for i in attraction_mask:
+                    peaks_lookup[i] = new_peak
 
         peaks = np.vstack((peaks, new_peak))
         labels.append(label)
 
-    print(peaks)
-    print(peaks.shape)
-    #plotclusters3D(data_transpose, labels, peaks)
-    # unique = np.unique(peaks, axis=0)
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    x = np.array(data_transpose[:, 0])
-    y = np.array(data_transpose[:, 1])
-    z = np.array(data_transpose[:, 2])
-
-    ax.scatter(x, y, z, marker="s", c=labels, s=40, cmap="RdBu")
-
-    plt.show()
+    return labels, peaks
 
 
+#img = cv2.imread('m.jpg', 0)
+#cv2.imshow('image',img)
 
+mat_dict = scipy.io.loadmat('pts.mat')
+data = mat_dict['data']
 
+t1 = time.time()
+labels, peaks = mean_shift(data, radius=2)
+t2 = time.time()
+print('Run time: ', t2-t1, " seconds with heuristic")
 
+t1 = time.time()
+labels, peaks = mean_shift(data, radius=2, attraction_basin=False)
+t2 = time.time()
+print('Run time: ', t2-t1, " seconds without heuristic")
 
-mean_shift(data, r=2)
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+x = np.array(data[0, :])
+y = np.array(data[1, :])
+z = np.array(data[2, :])
+ax.scatter(x, y, z, marker="s", c=labels, s=40, cmap="RdBu")
+plt.show()
