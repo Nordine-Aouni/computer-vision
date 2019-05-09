@@ -2,12 +2,12 @@ import numpy as np
 import cv2
 import scipy.io
 from scipy.spatial.distance import pdist, cdist, squareform
-from plotclusters3D import plotclusters3D
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import time
 
 
-def find_peak(data, index, radius, metric="euclidean", threshold=0.01, verbose=False):
+def find_peak(data, index, radius, metric="euclidean", threshold=0.01, search_path=True, verbose=False):
     """
 
     :param data: m by n array of m points in a n-dimensional space
@@ -15,6 +15,7 @@ def find_peak(data, index, radius, metric="euclidean", threshold=0.01, verbose=F
     :param radius: Radius (in chosen metric) of the search window.
     :param metric: Distance measure (e.g 'euclidean')
     :param threshold: Distance between consecutive peaks, acts as a stopping criterion
+    :param search_path: Boolean activating the search-path heuristic. Heuristic recommended for speedup.
     :param verbose: Boolean for additional printing
     :return: The peak of the corresponding point as a (n,) array
     """
@@ -32,7 +33,7 @@ def find_peak(data, index, radius, metric="euclidean", threshold=0.01, verbose=F
         # Compute pairwise dist between point of interest and others.
         # Note: cdist requires its input to have the same number of dimensions.
         pair_dist = cdist(peak, data, metric).ravel()
-        window = np.argwhere(pair_dist <= radius).ravel()  # Discard points outside window
+        window = np.argwhere(pair_dist <= radius).ravel()  # Create search window composed of nearby points
 
         previous_peak = peak  # Store previous peak
         peak = data[window, :].mean(axis=0)  # Update peak coordinates to mean of window points
@@ -43,22 +44,24 @@ def find_peak(data, index, radius, metric="euclidean", threshold=0.01, verbose=F
     if verbose:
         print("Converged to: ", peak, '\n')
 
-    return peak
+    return peak, None
 
 
-def mean_shift(data, radius, attraction_basin=True):
+def mean_shift(data, radius, attraction_basin=True, search_path=True):
     """
+    Segment input points into group of peaks and labels.
     Find peak of every points in data according to the mean-shift algorithm.
     :param data: (m, n) array of m points in a n-dimensional space
     :param radius: Radius of search window used to calculate peaks.
     :param attraction_basin: Boolean activating the basin-of-attraction heuristic. Heuristic recommended for speedup.
+    :param search_path: Boolean activating the search-path heuristic. Heuristic recommended for speedup.
     :return: (labels, peaks) Segmentation as a list of integers and a (m, n) array of peaks corresponding to input points
     """
 
     data_transpose = data.T  # Note: cdist requires points as rows hence why the transpose operation
     inter_peak_threshold = radius / 4  # Arbitrary threshold. See assignment description
     # Initialize matrix of peaks with peak corresponding to first index
-    first_peak = find_peak(data_transpose, 0, radius, verbose=False)
+    first_peak, in_search_path = find_peak(data_transpose, 0, radius, verbose=False)
     peaks = first_peak[np.newaxis, :]  # Reshape so that peak matrix is initialized shape (1, n)
     peaks_lookup = [None for _ in range(len(data_transpose))]
     labels = [0]  # Initialize first label
@@ -70,28 +73,35 @@ def mean_shift(data, radius, attraction_basin=True):
 
         else:  # No corresponding entry or no heuristics thus start search for peak
 
-            new_peak = find_peak(data_transpose, index, radius, verbose=False)
+            new_peak, in_search_path = find_peak(data_transpose, index, radius, verbose=False)
+
+            if attraction_basin:  # Basin-of-attraction heuristic: assign same peak to points lying within radius dist.
+                # Note: cdist requires inputs to have same number of dimensions, and rows to stand for points.
+                attraction_dist = cdist(new_peak[np.newaxis, :], data_transpose)  # dist between points and current peak
+                attraction_mask = np.argwhere(attraction_dist <= radius).ravel()  # Indices of attracted points
+
             # Check if new peak should be merged with existing one
             # Note: cdist requires its input to have the same number of dimensions. Thus reshape peak from (n,) to (1, n)
             inter_peak_dist = cdist(new_peak[np.newaxis, :], peaks).ravel()
             match = np.argwhere(inter_peak_dist < inter_peak_threshold).ravel()
 
-            if len(match) == 0:  # By construction of the matrix peaks there can only be 0 or 1 match
-                label = labels[-1]+1  # No match thus assign new label and peak as it is.
+            if match.size == 0:  # By construction of the matrix peaks there can only be 0 or 1 match
+                label = labels[-1]+1  # No match thus assign new label and keep peak as it is.
             else:
                 new_peak = peaks[match[0], :]  # Match found thus assign matching peak to current point
                 label = labels[match[0]]  # Match found thus assign matching label to current point
 
-        if attraction_basin:  # Basin-of-attraction heuristic: assign same peak to points lying within radius dist.
-            # Note: cdist requires inputs to have same number of dimensions and rows to be points.
-            attraction_dist = cdist(new_peak[np.newaxis, :], data_transpose)  # dist between points and current peak
-            attraction_mask = np.argwhere(attraction_dist <= radius).ravel()  # Indices of attracted points
-            if len(attraction_mask) > 0:
-                for i in attraction_mask:
-                    peaks_lookup[i] = new_peak
+            if attraction_basin:  # Basin-of-attraction heuristic: assign same peak to points lying within radius dist.
+                for i in attraction_mask:  # For points in the basin of attraction of that peak:
+                    peaks_lookup[i] = new_peak  # assign corresponding peak to that point.
 
-        peaks = np.vstack((peaks, new_peak))
-        labels.append(label)
+        if search_path:
+            indices_in_search_path = np.argwhere(in_search_path == 1)  # Indices of points in search paths
+            for i in indices_in_search_path:  # For every points in search path:
+                peaks_lookup[i] = new_peak  # assign corresponding peak to that point.
+
+        peaks = np.vstack((peaks, new_peak))  # Store the peak of the point being processed
+        labels.append(label)  # Store the label of the point being processed
 
     return labels, peaks
 
