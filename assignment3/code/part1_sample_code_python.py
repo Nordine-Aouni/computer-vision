@@ -6,7 +6,35 @@ import copy
 
 
 def fit_fundamental_matrix(matches):
+    """
+
+    :param matches: (m, 4) arrays containing the coordinates of m pairwise-matching points as x, y, x', y'.
+    :return: Fundamental matrix F as an (3, 3) array
+    """
     print("Fitting of the fundamental Matrix takes place here!!!")
+
+    x, y, x_prime, y_prime = matches[:, 0], matches[:, 1], matches[:, 2], matches[:, 3]  # Coordinates of matches
+
+    A = np.array([x * x_prime,
+                  x * y_prime,
+                  x,
+                  x_prime * y,
+                  y * y_prime,
+                  y,
+                  x_prime,
+                  y_prime,
+                  np.ones_like(x)]).T
+
+    _, _, V_transposed = np.linalg.svd(A)  # SVD decomposition of A
+    F = V_transposed[-1, :].reshape(3, 3)  # Fundamental matrix
+
+    U_f, D_f, V_f_transposed = np.linalg.svd(F)
+    D_f[-1] = 0  # Set smallest s.v of F to 0 to make it have rank 2
+    F = U_f @ np.diag(D_f) @ V_f_transposed  # Reconstruct  F as a rank 2 matrix
+
+    return F
+
+
 
 
 if __name__ == '__main__':
@@ -39,7 +67,7 @@ if __name__ == '__main__':
     plt.show()
 
     # first, fit fundamental matrix to the matches
-    F = fit_fundamental_matrix(matches);  # this is a function that you should write
+    F = fit_fundamental_matrix(matches)  # this is a function that you should write
     '''
     display second image with epipolar lines reprojected from the first image
     '''
