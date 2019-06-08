@@ -43,7 +43,7 @@ def find_matching_points(image1, image2, n_levels=3, distance_threshold=300):
     return np.array(matches_1), np.array(matches_2)
 
 
-def RANSAC_for_fundamental_matrix(matches, sample_size=8, iterations_required=500, inlier_threshold=0.005,
+def RANSAC_for_fundamental_matrix(matches, sample_size=8, iterations_required=3000, inlier_threshold=0.00005,
                                   acceptance_threshold=10):  # this is a function that you should write
 
     p, p_prime = matches[:, 0:2], matches[:, 2:4]  # Split points
@@ -72,6 +72,7 @@ def RANSAC_for_fundamental_matrix(matches, sample_size=8, iterations_required=50
         if inlier_count > max_inlier_count:
             best_matrix = fundamental_matrix
             best_matches = matches[inliers, :]
+            max_inlier_count = inlier_count
 
         iteration += 1
 

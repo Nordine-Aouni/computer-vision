@@ -11,7 +11,6 @@ def fit_fundamental_matrix(matches):
     :param matches: (m, 4) arrays containing the coordinates of m pairwise-matching points as x, y, x', y'.
     :return: Fundamental matrix F as an (3, 3) array of rank 2.
     """
-    print("Fitting of the fundamental Matrix takes place here!!!")
 
     x, y, x_prime, y_prime = matches[:, 0], matches[:, 1], matches[:, 2], matches[:, 3]  # Coordinates of matches
 
