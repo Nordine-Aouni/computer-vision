@@ -7,9 +7,9 @@ import copy
 
 def fit_fundamental_matrix(matches):
     """
-
+    Fit the fundamental matrix between two images given pairs of matching points.
     :param matches: (m, 4) arrays containing the coordinates of m pairwise-matching points as x, y, x', y'.
-    :return: Fundamental matrix F as an (3, 3) array
+    :return: Fundamental matrix F as an (3, 3) array of rank 2.
     """
     print("Fitting of the fundamental Matrix takes place here!!!")
 
@@ -26,11 +26,13 @@ def fit_fundamental_matrix(matches):
                   np.ones_like(x)]).T
 
     _, _, V_transposed = np.linalg.svd(A)  # SVD decomposition of A
-    F = V_transposed[-1, :].reshape(3, 3)  # Fundamental matrix
 
+    F = V_transposed[-1, :].reshape(3, 3)  # Fundamental matrix corresponds to the column of V of the least sing value
+
+    # Make the fundamental matrix rank 2
     U_f, D_f, V_f_transposed = np.linalg.svd(F)
-    D_f[-1] = 0  # Set smallest s.v of F to 0 to make it have rank 2
-    F = U_f @ np.diag(D_f) @ V_f_transposed  # Reconstruct  F as a rank 2 matrix
+    D_f[-1] = 0  # Set smallest s.v of F to 0
+    F = U_f @ np.diag(D_f) @ V_f_transposed  # Reconstruct F as a rank 2 matrix
 
     return F
 
