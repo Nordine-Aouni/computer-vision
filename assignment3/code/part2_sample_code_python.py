@@ -5,6 +5,7 @@ from cyvlfeat import sift
 from scipy.spatial.distance import cdist
 import matplotlib.cm as cm
 import copy
+from assignment3.code.part1_sample_code_python import fit_fundamental_matrix
 
 
 def find_matching_points(image1, image2, n_levels=3, distance_threshold=300):
@@ -42,8 +43,39 @@ def find_matching_points(image1, image2, n_levels=3, distance_threshold=300):
     return np.array(matches_1), np.array(matches_2)
 
 
-def RANSAC_for_fundamental_matrix(matches):  # this is a function that you should write
-    print('Implementation of RANSAC to to find the best fundamental matrix takes place here')
+def RANSAC_for_fundamental_matrix(matches, sample_size=8, iterations_required=500, inlier_threshold=0.005,
+                                  acceptance_threshold=10):  # this is a function that you should write
+
+    p, p_prime = matches[:, 0:2], matches[:, 2:4]  # Split points
+    # Append a column of 1 to the points for the evaluation of the fundamental matrix estimate
+    p, p_prime = np.hstack((p, np.ones((matches.shape[0], 1)))), np.hstack((p_prime, np.ones((matches.shape[0], 1))))
+
+    iteration = 0
+    candidates = np.arange(matches.shape[0])
+    max_inlier_count = 0
+    best_matrix = None
+    best_matches = None
+
+    while iteration < iterations_required:
+
+        sampled_id = np.random.choice(candidates, size=sample_size, replace=False)  # Sample 8 points
+        fundamental_matrix = fit_fundamental_matrix(matches[sampled_id, :])  # Fit a fundamental matrix using them
+
+        # Check if every other point agrees with this model
+        intermediate_results = p @ fundamental_matrix
+        results = np.array([intermediate_results[i, :] @ p_prime[i, :] for i in range(matches.shape[0])])
+
+        inliers = np.nonzero(results < inlier_threshold)[0]  # Indices of points consistent with the model
+        inlier_count = inliers.size
+
+        # Update best fundamental matrix found so far
+        if inlier_count > max_inlier_count:
+            best_matrix = fundamental_matrix
+            best_matches = matches[inliers, :]
+
+        iteration += 1
+
+    return best_matrix, best_matches
 
 
 if __name__ == '__main__':
@@ -71,8 +103,8 @@ if __name__ == '__main__':
     '''
 
     I3 = np.zeros((I1.size[1], I1.size[0] * 2, 3))
-    I3[:, :I1.size[0], :] = I1;
-    I3[:, I1.size[0]:, :] = I2;
+    I3[:, :I1.size[0], :] = I1
+    I3[:, I1.size[0]:, :] = I2
     matches_to_plot[:, 2] += I2.size[0]  # add to the x-coordinate of second image
     fig, ax = plt.subplots()
     ax.set_aspect('equal')
@@ -88,6 +120,7 @@ if __name__ == '__main__':
     '''
     display second image with epipolar lines reprojected from the first image
     '''
+    N = len(best_matches)
     M = np.c_[best_matches[:, 0:2], np.ones((N, 1))].transpose()
     L1 = np.matmul(F, M).transpose()  # transform points from
     # the first image to get epipolar lines in the second image
