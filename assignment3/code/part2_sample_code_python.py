@@ -40,11 +40,22 @@ def find_matching_points(image1, image2, n_levels=3, distance_threshold=300):
         if pairwise_dist[i, idx] <= distance_threshold:
             matches_1.append([keypoints_1[i][1], keypoints_1[i][0]])
             matches_2.append([keypoints_2[idx][1], keypoints_2[idx][0]])
+
     return np.array(matches_1), np.array(matches_2)
 
 
-def RANSAC_for_fundamental_matrix(matches, sample_size=8, iterations_required=3000, inlier_threshold=0.00005,
+def RANSAC_for_fundamental_matrix(matches, sample_size=8, iterations_required=3000, inlier_threshold=0.005,
                                   acceptance_threshold=10):  # this is a function that you should write
+    """
+    Use RANSAC to find a suitable fundamental matrix given the pairs of matching points
+    :param matches: (m, 4) array of m pairs of points stored as x, y, x', y'
+    :param sample_size: Require number of points to fit a model
+    :param iterations_required: Required number of iteration to sample in RANSAC
+    :param inlier_threshold: Max error to still be considered an inlier
+    :param acceptance_threshold: Number of inliers required to exit the process early (not used yet)
+    :return: Best fundamental matrix as a (3, 3) array, and pairs of inliers as (m', 4) array
+    """
+
 
     p, p_prime = matches[:, 0:2], matches[:, 2:4]  # Split points
     # Append a column of 1 to the points for the evaluation of the fundamental matrix estimate
@@ -65,7 +76,8 @@ def RANSAC_for_fundamental_matrix(matches, sample_size=8, iterations_required=30
         intermediate_results = p @ fundamental_matrix
         results = np.array([intermediate_results[i, :] @ p_prime[i, :] for i in range(matches.shape[0])])
 
-        inliers = np.nonzero(results < inlier_threshold)[0]  # Indices of points consistent with the model
+        abs_results = np.abs(results)
+        inliers = np.nonzero(abs_results < inlier_threshold)[0]  # Indices of points consistent with the model
         inlier_count = inliers.size
 
         # Update best fundamental matrix found so far
@@ -92,7 +104,7 @@ if __name__ == '__main__':
     hsize = int((float(I2.size[1]) * float(wpercent)))
     I2 = I2.resize((basewidth, hsize), Image.ANTIALIAS)
 
-    matchpoints1, matchpoints2 = find_matching_points(I1, I2, n_levels=3, distance_threshold=200)
+    matchpoints1, matchpoints2 = find_matching_points(I1, I2, n_levels=3, distance_threshold=150)
     matches = np.hstack((matchpoints1, matchpoints2))
 
     N = len(matches)
@@ -117,6 +129,7 @@ if __name__ == '__main__':
 
     # first, find the fundamental matrix to on the unreliable matches using RANSAC
     [F, best_matches] = RANSAC_for_fundamental_matrix(matches)  # this is a function that you should write
+
 
     '''
     display second image with epipolar lines reprojected from the first image
@@ -144,6 +157,7 @@ if __name__ == '__main__':
     ax.plot([best_matches[:, 2], closest_pt[:, 0]], [best_matches[:, 3], closest_pt[:, 1]], 'r')
     ax.plot([pt1[:, 0], pt2[:, 0]], [pt1[:, 1], pt2[:, 1]], 'g')
     plt.show()
+    fig.savefig('img')
 
     ## optional, re-estimate the fundamental matrix using the best matches, similar to part1
     # F = fit_fundamental_matrix(best_matches); # this is a function that you wrote for part1
