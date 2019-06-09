@@ -43,7 +43,7 @@ if __name__ == '__main__':
     # load images and match files for the first example
 
     I1 = Image.open('../data/library/library1.jpg')
-    I2 = Image.open('../data/library/library1.jpg')
+    I2 = Image.open('../data/library/library2.jpg')
     matches = np.loadtxt('../data/library/library_matches.txt')
 
     N = len(matches)
@@ -94,3 +94,21 @@ if __name__ == '__main__':
     ax.plot([matches[:, 2], closest_pt[:, 0]], [matches[:, 3], closest_pt[:, 1]], 'r')
     ax.plot([pt1[:, 0], pt2[:, 0]], [pt1[:, 1], pt2[:, 1]], 'g')
     plt.show()
+    fig.savefig('library2_result')
+
+    # Plot first image and corresponding keypoints
+    fig, ax = plt.subplots()
+    ax.set_aspect('equal')
+    ax.imshow(I1)
+    ax.plot(matches[:, 0], matches[:, 1], '+r')
+    plt.show()
+    fig.savefig('library1_result')
+
+    # Compute the residual (i.e MSE) of F
+    p, p_prime = matches[:, 0:2], matches[:, 2:4]  # Split points
+    # Append a column of 1 to the points for the evaluation of the fundamental matrix estimate
+    p, p_prime = np.hstack((p, np.ones((matches.shape[0], 1)))), np.hstack((p_prime, np.ones((matches.shape[0], 1))))
+    intermediate_results = p @ F
+    results = np.array([intermediate_results[i, :] @ p_prime[i, :] for i in range(matches.shape[0])])
+    residual = np.square(results).sum()
+    print('Residual: ', residual)

@@ -44,7 +44,7 @@ def find_matching_points(image1, image2, n_levels=3, distance_threshold=300):
     return np.array(matches_1), np.array(matches_2)
 
 
-def RANSAC_for_fundamental_matrix(matches, sample_size=8, iterations_required=3000, inlier_threshold=0.005,
+def RANSAC_for_fundamental_matrix(matches, sample_size=8, iterations_required=5000, inlier_threshold=0.005,
                                   acceptance_threshold=10):  # this is a function that you should write
     """
     Use RANSAC to find a suitable fundamental matrix given the pairs of matching points
@@ -161,3 +161,9 @@ if __name__ == '__main__':
 
     ## optional, re-estimate the fundamental matrix using the best matches, similar to part1
     # F = fit_fundamental_matrix(best_matches); # this is a function that you wrote for part1
+
+    fig, ax = plt.subplots()
+    ax.imshow(I1)
+    ax.plot(best_matches[:, 0], best_matches[:, 1], '+r')
+    plt.show()
+    fig.savefig('img2')
