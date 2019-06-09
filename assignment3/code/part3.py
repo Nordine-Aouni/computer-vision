@@ -7,7 +7,7 @@ def camera_centre(camera):
     return V[-1,:] / V[-1,-1]
 
 option = "library"
-option = "house"
+#option = "house"
 
 with open(option+"_matches.txt", "r") as f:
     matches = np.array([[float(x) for x in line.split()] for line in f])
@@ -95,8 +95,5 @@ ax = fig.add_subplot(111, projection = '3d')
 ax.scatter(x, y, z, color="b", alpha=0.8)
 ax.scatter(cx1, cy1, cz1, color="r", alpha=0.9)
 ax.scatter(cx2, cy2, cz2, color="r", alpha=0.9)
-
-
-plt.show()
 
 plt.show()
