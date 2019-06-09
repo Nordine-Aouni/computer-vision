@@ -48,6 +48,7 @@ ax.imshow(plt.imread(option+"2.jpg"))
 ax = fig.add_subplot(224)
 ax.imshow(plt.imread(option+"2.jpg"))
 ax.scatter(x2, y2)
+fig.savefig(option+"Plot.png")
 
 
 points = []
@@ -95,5 +96,7 @@ ax = fig.add_subplot(111, projection = '3d')
 ax.scatter(x, y, z, color="b", alpha=0.8)
 ax.scatter(cx1, cy1, cz1, color="r", alpha=0.9)
 ax.scatter(cx2, cy2, cz2, color="r", alpha=0.9)
-
+for angle in np.arange(0, 180, 30):
+    ax.view_init(30, -angle)
+    fig.savefig(option+"3D_"+str(angle)+".png")
 plt.show()
