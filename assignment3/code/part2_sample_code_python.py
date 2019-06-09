@@ -128,7 +128,7 @@ if __name__ == '__main__':
     plt.show()
 
     # first, find the fundamental matrix to on the unreliable matches using RANSAC
-    [F, best_matches] = RANSAC_for_fundamental_matrix(matches)  # this is a function that you should write
+    F, best_matches = RANSAC_for_fundamental_matrix(matches)  # this is a function that you should write
 
 
     '''
